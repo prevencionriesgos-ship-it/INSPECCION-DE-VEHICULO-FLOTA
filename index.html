@@ -54,7 +54,6 @@ canvas{width:100%;height:120px;border:1px solid var(--bd);border-radius:4px;back
   <button id="bs">Guardar en Drive</button>
   <button class="s" id="bp">Descargar PDF (carta)</button>
   <button class="s" id="bc">Compartir</button>
-  <button class="s" id="bj">Descargar JSON</button>
   </div>
 </main>
 
@@ -597,11 +596,6 @@ function detalle(c) {
   return r;
 }
 
-$("#bj").onclick = () => {
-  const d = datos(), a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 1)], { type: "application/json" }));
-  a.download = nombrePdf(d.campos).replace(".pdf", ".json"); a.click();
-};
 $("#bc").onclick = async () => {
   const d = datos(), f = new File([pdf(d).output("blob")], nombrePdf(d.campos), { type: "application/pdf" });
   if (navigator.canShare && navigator.canShare({ files: [f] })) {
