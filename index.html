@@ -34,6 +34,8 @@ input[type=text],input[type=number],input[type=date],input[type=datetime-local],
 .ph{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
 .ph div{border:1px dashed var(--bd);border-radius:6px;padding:6px;font-size:12px;text-align:center;font-weight:600;color:var(--mu)}
 .ph input{font-size:11px;width:100%;margin-top:4px}
+.ph img[hidden]{display:none}
+.ph small{display:block;color:#1e8e4e;font-weight:600;margin-top:3px}
 .ph img{width:100%;height:80px;object-fit:cover;border-radius:4px;display:block;margin-top:4px}
 button{padding:10px 16px;border:0;border-radius:4px;background:var(--ac);color:#fff;font:inherit;font-weight:600;cursor:pointer;margin:2px 4px 2px 0}
 button.s{background:var(--mu)}
@@ -481,7 +483,7 @@ $("#f").innerHTML = `
 <section><h2>7. Niveles y mecánica básica</h2>${MEC.map(n => filaEstado("mec", n)).join("")}
 <label style="margin-top:8px">Ruidos o fallas detectadas<textarea name="fallas" rows="2"></textarea></label></section>
 
-<section><h2>8. Registro fotográfico</h2><div class="ph">${FOTOS.map(n => `<div>${n}<input type="file" accept="image/*" capture="environment" data-f="${n}"><img alt="" hidden></div>`).join("")}</div></section>
+<section><h2>8. Registro fotográfico</h2><div class="ph">${FOTOS.map(n => `<div>${n}<input type="file" accept="image/*" capture="environment" data-f="${n}"><img alt="" hidden><small></small></div>`).join("")}</div></section>
 
 <section><h2>9. Firmas</h2><div class="g">
 <label>Entrega (nombre)<input type="text" name="firma_entrega"></label>
@@ -500,7 +502,9 @@ document.querySelectorAll("input[type=file]").forEach(inp => inp.addEventListene
     c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
     fotos[inp.dataset.f] = c.toDataURL("image/jpeg", nitido ? 0.6 : 0.5);
     const p = inp.parentNode.querySelector("img"); p.src = fotos[inp.dataset.f]; p.hidden = false;
+    inp.parentNode.querySelector("small").textContent = "✔ Foto lista (" + Math.round(fotos[inp.dataset.f].length * 0.75 / 1024) + " KB)";
   };
+  img.onerror = () => { inp.value = ""; delete fotos[inp.dataset.f]; msg("No se pudo leer la foto «" + inp.dataset.f + "». Sácala de nuevo.", false); };
   img.src = URL.createObjectURL(file);
 }));
 
@@ -559,8 +563,8 @@ function pdf(d) {
   if (v("fallas")) { nl(12); y += 2; tx("Ruidos o fallas:", M, 9, 1); y += 4; const l = doc.splitTextToSize(v("fallas"), W - 2 * M); nl(l.length * 4); doc.setFont("helvetica", "normal"); doc.text(l, M, y); y += l.length * 4; }
 
   const fs = FOTOS.filter(n => d.fotos[n]);
-  if (fs.length) {
-    sec("8. Registro fotográfico"); y += 2;
+  sec("8. Registro fotográfico"); y += 2;
+  if (!fs.length) { nl(8); tx("Sin fotos adjuntas en esta inspección.", M, 9); y += 6; } else {
     const bw = 58, bh = 44, gap = 4.5; let x = M;
     fs.forEach((n, i) => {
       if (i % 3 === 0) { if (i) y += bh + 8; nl(bh + 8); x = M; }
@@ -601,7 +605,7 @@ $("#bs").onclick = async () => {
   msg("Preparando PDF…", true);
   try {
     const b64 = pdf(d).output("datauristring").split(",")[1];
-    msg("Subiendo PDF (" + Math.round(b64.length * 0.75 / 1024) + " KB)…", true);
+    msg("Subiendo PDF (" + Math.round(b64.length * 0.75 / 1024) + " KB, " + Object.keys(d.fotos).length + " fotos)…", true);
     const r = await fetch(APPS_SCRIPT_URL, { method: "POST", body: JSON.stringify({
       token: TOKEN, nombre: nombrePdf(c), pdf: b64,
       empresa: c.empresa, proyecto: c.proyecto, datos: c, patente: c.patente.toUpperCase(), fecha: c.fecha, modelo: c.modelo, conductor: c.conductor, tipo: c.tipo, km: c.km,
