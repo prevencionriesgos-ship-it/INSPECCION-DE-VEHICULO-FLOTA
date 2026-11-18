@@ -585,6 +585,18 @@ function pdf(d) {
 
 const nombrePdf = c => `Inspeccion_${esc((c.patente || "SIN-PATENTE").toUpperCase())}_${(c.fecha || new Date().toISOString().slice(0, 16)).replace(/[:T]/g, "-")}.pdf`;
 
+// Detalle completo de cada ítem (se registra en la hoja "Detalle" de la planilla)
+function detalle(c) {
+  const v = k => c[k] || "", r = [];
+  DOCS.forEach(n => r.push(["Documentación", n, c["doc|" + n + "|ok"] ? "Presente" : "No presente", v("doc|" + n + "|venc"), ""]));
+  EQ.forEach(([n]) => r.push(["Equipamiento de seguridad", n, v("eq|" + n) || "Sin marcar", v("eq|" + n + "|venc"), v("eq|" + n + "|obs")]));
+  [["Llave principal", c.llave_principal], ["Llave de repuesto", c.llave_repuesto], ["Control remoto / alarma", c.control_remoto]]
+    .forEach(([n, x], i) => r.push(["Llaves", n, x ? "Sí" : "No", "", i === 2 ? v("llaves_obs") : ""]));
+  [["Estado exterior", "ext", EXT], ["Estado interior", "int", INT], ["Niveles y mecánica", "mec", MEC]]
+    .forEach(([t, k, L]) => L.forEach(n => r.push([t, n, v(k + "|" + n) || "Sin marcar", "", v(k + "|" + n + "|obs")])));
+  return r;
+}
+
 $("#bj").onclick = () => {
   const d = datos(), a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 1)], { type: "application/json" }));
@@ -608,7 +620,7 @@ $("#bs").onclick = async () => {
     msg("Subiendo PDF (" + Math.round(b64.length * 0.75 / 1024) + " KB, " + Object.keys(d.fotos).length + " fotos)…", true);
     const r = await fetch(APPS_SCRIPT_URL, { method: "POST", body: JSON.stringify({
       token: TOKEN, nombre: nombrePdf(c), pdf: b64,
-      empresa: c.empresa, proyecto: c.proyecto, datos: c, patente: c.patente.toUpperCase(), fecha: c.fecha, modelo: c.modelo, conductor: c.conductor, tipo: c.tipo, km: c.km,
+      empresa: c.empresa, proyecto: c.proyecto, datos: c, detalle: detalle(c), nfotos: Object.keys(d.fotos).length, entrega: c.firma_entrega, recibe: c.firma_recibe, patente: c.patente.toUpperCase(), fecha: c.fecha, modelo: c.modelo, conductor: c.conductor, tipo: c.tipo, km: c.km,
       combustible: c.combustible, malos: Object.values(c).filter(x => x === "M").length, fallas: c.fallas }) });
     const j = await r.json(); if (!j.ok) throw new Error(j.error);
     msg("✔ PDF guardado en el Drive y registro agregado a la planilla.", true);
