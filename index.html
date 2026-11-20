@@ -444,7 +444,12 @@ const EQ = [["Extintor",1],["Gata",0],["Llave de ruedas",0],["Rueda de repuesto"
 const EXT = ["Carrocería","Parabrisas y vidrios","Espejos","Luces (delanteras, traseras, freno, intermitentes)","Neumáticos (4)","Limpiaparabrisas"];
 const INT = ["Asientos (tapiz y cinturones)","Tablero / luces de advertencia","Alfombras / piso","Techo y puertas (tapices)","Limpieza general","Aire acondicionado / calefacción","Radio / accesorios"];
 const MEC = ["Aceite de motor","Refrigerante","Líquido de frenos","Agua limpiaparabrisas","Batería","Frenos (incluye freno de mano)"];
-const FOTOS = ["Frontal","Trasera","Lateral izquierdo","Lateral derecho","Tablero con kilometraje","Interior completo","Asientos delanteros","Asientos traseros","Maletero (gata, repuesto, extintor)","Extintor (fecha de vencimiento)","Neumáticos","Daño existente 1","Daño existente 2"];
+const FOTOS = ["Frontal","Trasera","Lateral izquierdo","Lateral derecho",
+  "Tablero con kilometraje","Interior completo","Asientos delanteros","Asientos traseros","Maletero",
+  "Extintor (fecha de vencimiento)","Botiquín (fecha de vencimiento)","Gata y llave de ruedas","Rueda de repuesto","Triángulos y chaleco",
+  "GPS","Corta corriente","Documentos (permiso, revisión técnica, SOAP)","Compartimiento del motor",
+  "Neumático delantero izquierdo","Neumático delantero derecho","Neumático trasero izquierdo","Neumático trasero derecho",
+  "Daño existente 1","Daño existente 2","Daño existente 3","Foto adicional 1","Foto adicional 2","Foto adicional 3"];
 
 const $ = s => document.querySelector(s);
 const esc = s => s.replace(/[^a-z0-9]/gi, "_");
@@ -495,7 +500,7 @@ document.querySelectorAll("input[type=file]").forEach(inp => inp.addEventListene
   const file = e.target.files[0]; if (!file) return;
   const img = new Image();
   img.onload = () => {
-    const nitido = /Extintor|Tablero/.test(inp.dataset.f), lado = nitido ? 800 : 560; // fotos con texto a leer, un poco más nítidas
+    const nitido = /Extintor|Botiquín|Tablero|Documentos/.test(inp.dataset.f), lado = nitido ? 800 : 560; // fotos con texto a leer, un poco más nítidas
     const k = Math.min(1, lado / Math.max(img.width, img.height));
     const c = document.createElement("canvas"); c.width = img.width * k; c.height = img.height * k;
     c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
