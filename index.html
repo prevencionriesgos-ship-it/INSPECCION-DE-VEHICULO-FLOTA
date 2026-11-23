@@ -42,7 +42,16 @@ button.s{background:var(--mu)}
 .bar{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--bd);padding:10px 12px;text-align:center}
 #msg{max-width:860px;margin:0 auto 10px;padding:0 12px;font-weight:600;text-align:center}
 canvas{width:100%;height:120px;border:1px solid var(--bd);border-radius:4px;background:#fff;touch-action:none}
-@media print{button,.nop{display:none}body{background:#fff;color:#000}section{break-inside:avoid}}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:99;padding:16px}
+#ov[hidden]{display:none}
+#ov .card{background:var(--card);color:var(--tx);border-radius:10px;padding:22px;max-width:380px;width:100%;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.4)}
+#ov h3{margin:10px 0 4px}#ov p{margin:6px 0 14px;color:var(--mu)}
+.spin{width:38px;height:38px;border:4px solid var(--bd);border-top-color:var(--ac);border-radius:50%;margin:0 auto;animation:g 1s linear infinite}
+@keyframes g{to{transform:rotate(360deg)}}
+.ok,.er{font-size:44px;line-height:1;font-weight:700}.ok{color:#1e8e4e}.er{color:#c62f2f}
+#ov a{display:inline-block;padding:10px 16px;border-radius:4px;background:var(--mu);color:#fff;text-decoration:none;font-weight:600;margin:2px 4px}
+button:disabled{opacity:.6;cursor:not-allowed}
+@media print{#ov,button,.nop{display:none}body{background:#fff;color:#000}section{break-inside:avoid}}
 </style>
 </head>
 <body>
@@ -50,6 +59,7 @@ canvas{width:100%;height:120px;border:1px solid var(--bd);border-radius:4px;back
 <main>
 <form id="f" onsubmit="return false"></form>
 <div id="msg"></div>
+<div id="ov" hidden></div>
 <div class="nop bar">
   <button id="bs">Guardar en Drive</button>
   <button class="s" id="bp">Descargar PDF (carta)</button>
@@ -609,22 +619,42 @@ $("#bc").onclick = async () => {
 };
 $("#bp").onclick = () => { const d = datos(); pdf(d).save(nombrePdf(d.campos)); };
 
+// ===== Envío a Drive: un solo envío por inspección, con confirmación en pantalla =====
+let idEnvio = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2);
+let enviando = false, enviado = false;
+const esH = t => String(t || "").replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+const aviso = (html, botones) => { $("#ov").innerHTML = '<div class="card">' + html + "<div>" + (botones || "") + "</div></div>"; $("#ov").hidden = false; };
+
 $("#bs").onclick = async () => {
+  if (enviando || enviado) return;
   if (!APPS_SCRIPT_URL) return msg("Falta pegar la URL del Apps Script (APPS_SCRIPT_URL). Mientras tanto usa «Descargar PDF» o «Compartir».", false);
   const d = datos(), c = d.campos;
   if (!c.patente) return msg("Ingresa la patente.", false);
-  msg("Preparando PDF…", true);
+  enviando = true; $("#bs").disabled = true; $("#bs").textContent = "Enviando…"; msg("", true);
+  aviso('<div class="spin"></div><h3>Enviando inspección…</h3><p>Espera la confirmación. No cierres la página ni vuelvas a presionar el botón.</p>');
   try {
     const b64 = pdf(d).output("datauristring").split(",")[1];
-    msg("Subiendo PDF (" + Math.round(b64.length * 0.75 / 1024) + " KB, " + Object.keys(d.fotos).length + " fotos)…", true);
-    const r = await fetch(APPS_SCRIPT_URL, { method: "POST", body: JSON.stringify({
-      token: TOKEN, nombre: nombrePdf(c), pdf: b64,
-      empresa: c.empresa, proyecto: c.proyecto, datos: c, detalle: detalle(c), nfotos: Object.keys(d.fotos).length, entrega: c.firma_entrega, recibe: c.firma_recibe, patente: c.patente.toUpperCase(), fecha: c.fecha, modelo: c.modelo, conductor: c.conductor, tipo: c.tipo, km: c.km,
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 90000);
+    const r = await fetch(APPS_SCRIPT_URL, { method: "POST", signal: ctl.signal, body: JSON.stringify({
+      idEnvio, token: TOKEN, nombre: nombrePdf(c), pdf: b64,
+      empresa: c.empresa, proyecto: c.proyecto, datos: c, detalle: detalle(c), nfotos: Object.keys(d.fotos).length, entrega: c.firma_entrega, recibe: c.firma_recibe,
+      patente: c.patente.toUpperCase(), fecha: c.fecha, modelo: c.modelo, conductor: c.conductor, tipo: c.tipo, km: c.km,
       combustible: c.combustible, malos: Object.values(c).filter(x => x === "M").length, fallas: c.fallas }) });
-    const j = await r.json(); if (!j.ok) throw new Error(j.error);
-    msg("✔ PDF guardado en el Drive y registro agregado a la planilla.", true);
-  } catch (e) { msg("Error al guardar: " + e.message, false); }
+    clearTimeout(t);
+    const j = await r.json(); if (!j.ok) throw new Error(j.error || "Respuesta inválida");
+    enviado = true; $("#bs").textContent = "Enviado ✔";
+    const ver = /^https:\/\//.test(j.url || "") ? '<a href="' + esH(j.url) + '" target="_blank" rel="noopener">Ver PDF</a>' : "";
+    aviso('<div class="ok">✔</div><h3>Inspección enviada correctamente</h3><p>Patente <b>' + esH(c.patente.toUpperCase()) + '</b><br>El PDF quedó guardado en el Drive y registrado en la planilla.</p>',
+      ver + '<button onclick="location.reload()">Nueva inspección</button>');
+  } catch (e) {
+    const sinResp = e.name === "AbortError" ? "No se recibió respuesta a tiempo." : "No se pudo confirmar el envío (" + esH(e.message) + ").";
+    aviso('<div class="er">✖</div><h3>Envío sin confirmar</h3><p>' + sinResp + ' Revisa tu conexión y vuelve a presionar <b>Guardar en Drive</b>. Si el envío ya se había hecho, no se duplica.</p>', '<button onclick="cerrarAviso()">Entendido</button>');
+  } finally {
+    enviando = false;
+    if (!enviado) { $("#bs").disabled = false; $("#bs").textContent = "Guardar en Drive"; }
+  }
 };
+const cerrarAviso = () => { $("#ov").hidden = true; };
 </script>
 </body>
 </html>
